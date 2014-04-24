@@ -4,27 +4,33 @@ var util = require('util');
 var FonaFMRadio = module.exports = function() {
   Device.call(this);
   this._serialDevice = arguments[0];
+  
+  // properties
   this.volume = null;
+  this.outputType = null;
+  
+  // property map
+  this._outputTypesMap = {
+    0: 'headset',
+    1: 'external'
+  };
+  
 };
 util.inherits(FonaFMRadio, Device);
 
 FonaFMRadio.prototype.init = function(config) {
 
   config
-  .name('Adafruit Fona FMRadio')
+  .name('Adafruit Fona FM Radio')
   .type('fona-fm-radio')
   .monitor('volume')
-  .state('waiting')
-  .when('waiting', { allow: ['send-sms', 'read-sms']})
-  .when('sending-sms', { allow: ['read-sms']})
-  .when('reading-sms', { allow: ['send-sms']})
-  .map('read-sms', this.readSMS, [
-    { name: 'messageIndex', title: 'Message Index', type: 'range',
-      min: 1, step: 1}])
-  .map('send-sms', this.sendSMS, [
-    { name: 'phoneNumber', title: 'Phone Number to Send SMS', type: 'text'},
-    { name: 'message', title: 'Body of the SMS', type: 'text'},
-    ]);
+  .state('off')
+  .when('off', { allow: ['turn-on']})
+  .when('on', { allow: ['turn-off']})
+  .map('turn-on', this.turnOn, [
+    { name: 'output', title: 'Audio Output', type: 'range',
+      min: 0, max: 1, step: 1, value: 0, notes: this._outputTypesMap}])
+  .map('turn-off', this.turnOff);
 
   var self = this;
   this._requestVitals();
@@ -34,13 +40,38 @@ FonaFMRadio.prototype.init = function(config) {
 
 };
 
-FONA.prototype._requestFMVolume = function() {
+FonaFMRadio.prototype.turnOn = function(outputTypeCode, cb) {
+  var self = this;
+
+   // swallowing the error in case it's already on
+  this._serialDevice.enqueue(
+    {command: 'AT+FMOPEN='+outputTypeCode, regexps: [/^AT\+FMOPEN=\d/,/(OK|ERROR)/]},
+    function () {
+      self.outputType = self._outputTypesMap[outputTypeCode]
+      self.state = 'on';
+      cb();
+    });
+}
+
+FonaFMRadio.prototype.turnOff = function(cb) {
+  var self = this;
+  
+  // swallowing the error in case it's already off
+  this._serialDevice.enqueue(
+    {command: 'AT+FMCLOSE', regexps: [/^AT\+FMCLOSE/,/(OK|ERROR)/]},
+    function () {
+      self.state = 'off';
+      cb();
+    });
+}
+
+FonaFMRadio.prototype._requestVolume = function() {
   var self = this;
   this._serialDevice.enqueueSimple('AT+FMVOLUME?', /^\+FMVOLUME: (\d+)/, function (matches) {
-    self.fmVolume = matches[1][1]
+    self.volume = matches[1][1]
   });
 }
 
-FONA.prototype._requestVitals = function(context) {
-  this._requestFMVolume();
+FonaFMRadio.prototype._requestVitals = function() {
+  this._requestVolume();
 }
