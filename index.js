@@ -8,14 +8,20 @@ var FonaFMRadioScout = module.exports = function() {
 util.inherits(FonaFMRadioScout, Scout);
 
 FonaFMRadioScout.prototype.init = function(next) {
-  var queries = [
-    this.server.where({ type: 'serial' })
-  ];
+  var fonaFMRadioQuery = this.server.where({type: 'fona-fm-radio'});
+  var serialDeviceQuery = this.server.where({ type: 'serial' });
 
   var self = this;
-  this.server.observe(queries, function(serialDevice) {
-    self.discover(FonaFMRadio, serialDevice);
+  
+  this.server.observe(serialDeviceQuery, function(serialDevice) {
+    self.server.find(fonaFMRadioQuery, function(err, results) {
+      if (results[0]) {
+        self.provision(results[0], FonaFMRadio, serialDevice);
+      } else {
+        self.discover(FonaFMRadio, serialDevice);
+      }
+      next();
+    });
   });
 
-  next();
 }

@@ -54,12 +54,12 @@ FonaFMRadio.prototype.turnOn = function(outputTypeCode, cb) {
 
    // swallowing the error in case it's already on
   this._serialDevice.enqueue(
-    {command: 'AT+FMOPEN=' + outputTypeCode, regexps: [/^AT\+FMOPEN=\d/,/(OK|ERROR)/]},
+    {command: 'AT+FMOPEN=' + outputTypeCode, regexps: [/^$/,/(OK|ERROR)/]},
     function () {
       self.outputType = self._outputTypesMap[outputTypeCode]
       self.state = 'on';
       cb();
-      self.getVitals();
+      self._getVitals();
     });
 }
 
@@ -68,7 +68,7 @@ FonaFMRadio.prototype.turnOff = function(cb) {
   
   // swallowing the error in case it's already off
   this._serialDevice.enqueue(
-    {command: 'AT+FMCLOSE', regexps: [/^AT\+FMCLOSE/,/(OK|ERROR)/]},
+    {command: 'AT+FMCLOSE', regexps: [/^(|OK|ERROR)$/]},
     function () {
       self.state = 'off';
       cb();
@@ -79,7 +79,7 @@ FonaFMRadio.prototype.setFrequency = function(frequency, cb) {
   var self = this;
   
   this._serialDevice.enqueue(
-    {command: 'AT+FMFREQ=' + frequency, regexps: [/^AT\+FMFREQ=\d+/,/OK/]},
+    {command: 'AT+FMFREQ=' + frequency, regexps: [/^$/,/OK/]},
     function () {
       self.frequency = frequency;
       self.getSignalLevel(frequency, function() {
@@ -91,10 +91,9 @@ FonaFMRadio.prototype.setFrequency = function(frequency, cb) {
 FonaFMRadio.prototype.getSignalLevel = function(frequency, cb) {
   var self = this;
   
-  this._serialDevice.enqueueSimple(
-    'AT+FMSIGNAL=' + frequency,
-    /FMSIGNAL: freq\[\d+\]:(\d+)/,
-    function (matches) {
+  this._serialDevice.enqueue(
+    {command: 'AT+FMSIGNAL=' + frequency, regexps: [/^$/, /FMSIGNAL: freq\[\d+\]:(\d+)/]},
+    function(matches) {
       self.signalLevel = matches[1][1];
       cb();
     });
@@ -104,7 +103,7 @@ FonaFMRadio.prototype.setVolume = function(volume, cb) {
   var self = this;
   
   this._serialDevice.enqueue(
-    {command: 'AT+FMVOLUME=' + volume, regexps: [/^AT\+FMVOLUME=\d+/,/OK/]},
+    {command: 'AT+FMVOLUME=' + volume, regexps: [/^$/,/OK/]},
     function () {
       self.volume = volume;
       cb();
@@ -113,11 +112,13 @@ FonaFMRadio.prototype.setVolume = function(volume, cb) {
 
 FonaFMRadio.prototype.getVolume = function() {
   var self = this;
-  this._serialDevice.enqueueSimple('AT+FMVOLUME?', /^\+FMVOLUME: (\d+)/, function (matches) {
-    self.volume = matches[1][1]
-  });
+  this._serialDevice.enqueue(
+    {command: 'AT+FMVOLUME?', regexps: [/^$/]},
+    function(matches) {
+      self.volume = matches[0][1];
+    });
 }
 
-FonaFMRadio.prototype.getVitals = function() {
+FonaFMRadio.prototype._getVitals = function() {
   this.getVolume();
 }
