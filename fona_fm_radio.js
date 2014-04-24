@@ -8,6 +8,8 @@ var FonaFMRadio = module.exports = function() {
   // properties
   this.volume = null;
   this.outputType = null;
+  this.signalLevel = null;
+  this.frequency = null;
   
   // property map
   this._outputTypesMap = {
@@ -23,21 +25,28 @@ FonaFMRadio.prototype.init = function(config) {
   config
   .name('Adafruit Fona FM Radio')
   .type('fona-fm-radio')
-  .monitor('volume')
   .state('off')
   .when('off', { allow: ['turn-on']})
-  .when('on', { allow: ['turn-off']})
+  .when('on', { allow: ['turn-off', 'set-frequency', 'get-signal-level', 'set-volume', 'get-volume']})
   .map('turn-on', this.turnOn, [
-    { name: 'output', title: 'Audio Output', type: 'range',
-      min: 0, max: 1, step: 1, value: 0, notes: this._outputTypesMap}])
+    { name: 'output', title: 'Audio Output', type: 'radio', 
+      value: [{value: 0, text: this._outputTypesMap[0]},
+      {value: 1, text: this._outputTypesMap[1]}]}])
+  .map('set-frequency', this.setFrequency, [
+    { name: 'frequency', title: 'FM Frequency', type: 'range',
+      min: 870, max: 1090, step: 1 }])
+  .map('get-volume', this.getVolume)
+  .map('get-signal-level', this.getSignalLevel, [
+    { name: 'frequency', title: 'FM Frequency', type: 'range',
+      min: 870, max: 1090, step: 1 }])
+  .map('set-volume', this.setVolume, [
+    { name: 'volume', title: 'Volume', type: 'range',
+      min: 0, max: 6, step: 1 }])
   .map('turn-off', this.turnOff);
-
+  
   var self = this;
-  this._requestVitals();
-  setInterval(function() {
-    self._requestVitals();
-  }, 60000);
-
+  
+  this.turnOff(function() {});
 };
 
 FonaFMRadio.prototype.turnOn = function(outputTypeCode, cb) {
@@ -45,11 +54,12 @@ FonaFMRadio.prototype.turnOn = function(outputTypeCode, cb) {
 
    // swallowing the error in case it's already on
   this._serialDevice.enqueue(
-    {command: 'AT+FMOPEN='+outputTypeCode, regexps: [/^AT\+FMOPEN=\d/,/(OK|ERROR)/]},
+    {command: 'AT+FMOPEN=' + outputTypeCode, regexps: [/^AT\+FMOPEN=\d/,/(OK|ERROR)/]},
     function () {
       self.outputType = self._outputTypesMap[outputTypeCode]
       self.state = 'on';
       cb();
+      self.getVitals();
     });
 }
 
@@ -65,13 +75,49 @@ FonaFMRadio.prototype.turnOff = function(cb) {
     });
 }
 
-FonaFMRadio.prototype._requestVolume = function() {
+FonaFMRadio.prototype.setFrequency = function(frequency, cb) {
+  var self = this;
+  
+  this._serialDevice.enqueue(
+    {command: 'AT+FMFREQ=' + frequency, regexps: [/^AT\+FMFREQ=\d+/,/OK/]},
+    function () {
+      self.frequency = frequency;
+      self.getSignalLevel(frequency, function() {
+        cb();
+      });
+    });
+}
+
+FonaFMRadio.prototype.getSignalLevel = function(frequency, cb) {
+  var self = this;
+  
+  this._serialDevice.enqueueSimple(
+    'AT+FMSIGNAL=' + frequency,
+    /FMSIGNAL: freq\[\d+\]:(\d+)/,
+    function (matches) {
+      self.signalLevel = matches[1][1];
+      cb();
+    });
+}
+
+FonaFMRadio.prototype.setVolume = function(volume, cb) {
+  var self = this;
+  
+  this._serialDevice.enqueue(
+    {command: 'AT+FMVOLUME=' + volume, regexps: [/^AT\+FMVOLUME=\d+/,/OK/]},
+    function () {
+      self.volume = volume;
+      cb();
+    });
+}
+
+FonaFMRadio.prototype.getVolume = function() {
   var self = this;
   this._serialDevice.enqueueSimple('AT+FMVOLUME?', /^\+FMVOLUME: (\d+)/, function (matches) {
     self.volume = matches[1][1]
   });
 }
 
-FonaFMRadio.prototype._requestVitals = function() {
-  this._requestVolume();
+FonaFMRadio.prototype.getVitals = function() {
+  this.getVolume();
 }
