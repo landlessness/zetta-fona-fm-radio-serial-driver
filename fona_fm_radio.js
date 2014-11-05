@@ -59,7 +59,6 @@ FonaFMRadio.prototype.turnOn = function(outputTypeCode, cb) {
       self.outputType = self._outputTypesMap[outputTypeCode]
       self.state = 'on';
       cb();
-      self._getVitals();
     });
 }
 
@@ -117,8 +116,4 @@ FonaFMRadio.prototype.getVolume = function() {
     function(matches) {
       self.volume = matches[0][1];
     });
-}
-
-FonaFMRadio.prototype._getVitals = function() {
-  this.getVolume();
 }
