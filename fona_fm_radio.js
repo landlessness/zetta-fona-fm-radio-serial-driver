@@ -49,71 +49,114 @@ FonaFMRadio.prototype.init = function(config) {
   this.turnOff(function() {});
 };
 
-FonaFMRadio.prototype.turnOn = function(outputTypeCode, cb) {
+FonaFMRadio.prototype.turnOn = function(outputTypeCode, taskIsDone) {
   var self = this;
 
    // swallowing the error in case it's already on
-  this._serialDevice.enqueue(
-    {command: 'AT+FMOPEN=' + outputTypeCode, regexps: [/^$/,/(OK|ERROR)/]},
+  this._serialDevice.enqueue([
+    {
+      command: 'AT+FMOPEN=' + outputTypeCode, 
+      regexp: /^$/
+    },
+    {
+      regexp: /(OK|ERROR)/
+    }],
+    null,
     function () {
       self.outputType = self._outputTypesMap[outputTypeCode]
       self.state = 'on';
-      cb();
+      taskIsDone();
     });
 }
 
-FonaFMRadio.prototype.turnOff = function(cb) {
+FonaFMRadio.prototype.turnOff = function(taskIsDone) {
   var self = this;
   
   // swallowing the error in case it's already off
-  this._serialDevice.enqueue(
-    {command: 'AT+FMCLOSE', regexps: [/^(|OK|ERROR)$/]},
+  this._serialDevice.enqueue([
+    {
+      command: 'AT+FMCLOSE',
+      regexp: /^$/
+    },
+    {
+      regexp: /^OK|ERROR$/
+    }],
+    null,
     function () {
       self.state = 'off';
-      cb();
+      taskIsDone();
     });
 }
 
-FonaFMRadio.prototype.setFrequency = function(frequency, cb) {
+FonaFMRadio.prototype.setFrequency = function(frequency, taskIsDone) {
   var self = this;
   
-  this._serialDevice.enqueue(
-    {command: 'AT+FMFREQ=' + frequency, regexps: [/^$/,/OK/]},
+  this._serialDevice.enqueue([
+    {
+      command: 'AT+FMFREQ=' + frequency,
+      regexp: /^$/
+    },
+    {
+      regexp: /OK/
+    }],
+    null,
     function () {
       self.frequency = frequency;
-      self.getSignalLevel(frequency, function() {
-        cb();
-      });
+      taskIsDone();
     });
+
 }
 
-FonaFMRadio.prototype.getSignalLevel = function(frequency, cb) {
+FonaFMRadio.prototype.getSignalLevel = function(frequency, taskIsDone) {
   var self = this;
   
-  this._serialDevice.enqueue(
-    {command: 'AT+FMSIGNAL=' + frequency, regexps: [/^$/, /FMSIGNAL: freq\[\d+\]:(\d+)/]},
-    function(matches) {
-      self.signalLevel = matches[1][1];
-      cb();
-    });
+  this._serialDevice.enqueue([
+    {
+      command: 'AT+FMSIGNAL=' + frequency,
+      regexp: /^$/
+    },
+    { 
+      regexp: /FMSIGNAL: freq\[\d+\]:(\d+)/,
+      onMatch: function(match) {
+        self.signalLevel = match[1];
+        taskIsDone();
+      }
+    }]);
 }
 
-FonaFMRadio.prototype.setVolume = function(volume, cb) {
+FonaFMRadio.prototype.setVolume = function(volume, taskIsDone) {
   var self = this;
-  
-  this._serialDevice.enqueue(
-    {command: 'AT+FMVOLUME=' + volume, regexps: [/^$/,/OK/]},
+
+  this._serialDevice.enqueue([
+    {
+      command: 'AT+FMVOLUME=' + volume,
+      regexp: /^$/
+    },
+    {
+      regexp: /OK/
+    }],
+    null,
     function () {
       self.volume = volume;
-      cb();
+      taskIsDone();
     });
 }
 
-FonaFMRadio.prototype.getVolume = function() {
+FonaFMRadio.prototype.getVolume = function(taskIsDone) {
   var self = this;
-  this._serialDevice.enqueue(
-    {command: 'AT+FMVOLUME?', regexps: [/^$/]},
-    function(matches) {
-      self.volume = matches[0][1];
-    });
+  this._serialDevice.enqueue([
+    {
+      command: 'AT+FMVOLUME?',
+      regexp: /^$/
+    },{
+      regexp: /^\+FMVOLUME: (\d)$/,
+      onMatch: function(match) {
+        self.volume = match[1];
+        taskIsDone();
+      }
+    },{
+      regexp: /^$/
+    },{
+      regexp: /OK/
+    }]);
 }

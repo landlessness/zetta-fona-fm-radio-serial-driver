@@ -8,9 +8,9 @@
   },
   "license": "MIT",
   "dependencies": {
-    "zetta-device": "*",
-    "zetta-scout": "*",
-    "zetta-serial-device-driver": "*"
+    "zetta-device": "^0.8.0",
+    "zetta-scout": "^0.4.0",
+    "zetta-serial-device-driver": "^0.5.2"
   },
   "directories": {
     "example": "example"
